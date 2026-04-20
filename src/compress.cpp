@@ -61,6 +61,20 @@ void compress_stream(std::istream& in, std::ostream& out, const Options& opts) {
     }
     drain(0);
 
+    // Empty input: write a valid empty bzip2 stream (header + EOS + zero CRC)
+    // so that decompress_stream can round-trip it correctly.  This matches the
+    // output of standard `bzip2` on an empty file.
+    if (compressed_blocks.empty()) {
+        const uint8_t empty_stream[] = {
+            'B', 'Z', 'h', static_cast<uint8_t>('0' + opts.block_level),
+            0x17, 0x72, 0x45, 0x38, 0x50, 0x90,  // EOS magic (π digits √π)
+            0x00, 0x00, 0x00, 0x00                 // combined CRC = 0
+        };
+        out.write(reinterpret_cast<const char*>(empty_stream),
+                  static_cast<std::streamsize>(sizeof(empty_stream)));
+        return;
+    }
+
     // Each compressed_block is already a complete bzip2 stream produced by
     // BZ2_bzBuffToBuffCompress.  Concatenating them yields a valid multi-stream
     // .bz2 file per the bzip2 specification.
