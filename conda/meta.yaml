@@ -1,0 +1,40 @@
+{% set version = "0.2.0" %}
+
+package:
+  name: bzip2pb
+  version: {{ version }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  run_constrained:
+    - python >=3.8
+
+requirements:
+  build:
+    - {{ compiler('cxx') }}
+    - cmake >=3.20
+    - ninja
+  host:
+    - bzip2
+
+test:
+  commands:
+    - bzip2pb --version
+    - echo "hello world" | bzip2pb | bzip2pb -d   # [not win]
+
+about:
+  home: https://github.com/pvlbezdek/bzip2pb
+  license: MIT
+  license_file: LICENSE
+  summary: Parallel bzip2 compressor and decompressor
+  description: |
+    bzip2pb compresses and decompresses files using the bzip2 algorithm
+    with multi-threaded parallelism. Output is fully compatible with
+    standard bzip2 tools.
+
+extra:
+  recipe-maintainers:
+    - pvlbezdek
