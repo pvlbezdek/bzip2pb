@@ -124,3 +124,18 @@ if(Catch2_FOUND)
 else()
     message(STATUS "Catch2 not found — test target skipped")
 endif()
+
+# ---------------------------------------------------------------------------
+# Benchmarks
+# ---------------------------------------------------------------------------
+add_executable(bzip2pb_bench benchmarks/bench.cpp)
+target_link_libraries(bzip2pb_bench PRIVATE bzip2pb_lib)
+# benchmarks/ for bench.h; tests/ for testdata.h; src/ inherited from bzip2pb_lib
+target_include_directories(bzip2pb_bench PRIVATE benchmarks tests)
+
+add_custom_target(benchmark
+    COMMAND $<TARGET_FILE:bzip2pb_bench> --csv ${CMAKE_BINARY_DIR}/benchmark_results.csv
+    DEPENDS bzip2pb_bench
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Running bzip2pb benchmarks (this may take several minutes)"
+)
