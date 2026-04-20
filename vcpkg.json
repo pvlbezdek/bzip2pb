@@ -2,7 +2,8 @@
   "name": "bzip2pb",
   "version": "0.1.0",
   "dependencies": [
-    "bzip2"
+    "bzip2",
+    "catch2"
   ],
   "builtin-baseline": "c3867e714dd3a51c272826eea77267876517ed99"
 }

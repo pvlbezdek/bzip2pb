@@ -31,7 +31,7 @@ static std::vector<uint8_t> compress_block(std::vector<uint8_t> input, int level
     return output;
 }
 
-static void do_compress(std::istream& in, std::ostream& out, const Options& opts) {
+void compress_stream(std::istream& in, std::ostream& out, const Options& opts) {
     const uint32_t block_size =
         static_cast<uint32_t>(opts.block_level) * 100u * 1024u;
     const unsigned num_threads =
@@ -78,7 +78,7 @@ void compress_file(const std::string& input_path,
     if (!in) throw std::runtime_error("Cannot open: " + input_path);
     std::ofstream out(output_path, std::ios::binary);
     if (!out) throw std::runtime_error("Cannot create: " + output_path);
-    do_compress(in, out, opts);
+    compress_stream(in, out, opts);
 }
 
 void compress_file_stdout(const std::string& input_path, const Options& opts) {
@@ -87,7 +87,7 @@ void compress_file_stdout(const std::string& input_path, const Options& opts) {
 #ifdef _WIN32
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
-    do_compress(in, std::cout, opts);
+    compress_stream(in, std::cout, opts);
 }
 
 void compress_stdin(const Options& opts) {
@@ -95,5 +95,5 @@ void compress_stdin(const Options& opts) {
     _setmode(_fileno(stdin),  _O_BINARY);
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
-    do_compress(std::cin, std::cout, opts);
+    compress_stream(std::cin, std::cout, opts);
 }

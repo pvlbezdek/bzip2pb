@@ -27,7 +27,7 @@ public:
 #include <io.h>
 #endif
 
-static void do_decompress(std::istream& in, std::ostream& out, const Options& opts) {
+void decompress_stream(std::istream& in, std::ostream& out, const Options& opts) {
     // Load entire compressed file into memory (required for bit-level random access).
     // Memory usage: equal to the compressed file size — same model as lbzip2.
     const std::vector<uint8_t> compressed(
@@ -110,7 +110,7 @@ void decompress_file(const std::string& input_path,
     if (!in) throw std::runtime_error("Cannot open: " + input_path);
     std::ofstream out(output_path, std::ios::binary);
     if (!out) throw std::runtime_error("Cannot create: " + output_path);
-    do_decompress(in, out, opts);
+    decompress_stream(in, out, opts);
 }
 
 void decompress_file_stdout(const std::string& input_path, const Options& opts) {
@@ -119,14 +119,14 @@ void decompress_file_stdout(const std::string& input_path, const Options& opts) 
 #ifdef _WIN32
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
-    do_decompress(in, std::cout, opts);
+    decompress_stream(in, std::cout, opts);
 }
 
 void decompress_file_test(const std::string& input_path, const Options& opts) {
     std::ifstream in(input_path, std::ios::binary);
     if (!in) throw std::runtime_error("Cannot open: " + input_path);
     NullOStream null_out;
-    do_decompress(in, null_out, opts);
+    decompress_stream(in, null_out, opts);
 }
 
 void decompress_stdin(const Options& opts) {
@@ -134,7 +134,7 @@ void decompress_stdin(const Options& opts) {
     _setmode(_fileno(stdin),  _O_BINARY);
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
-    do_decompress(std::cin, std::cout, opts);
+    decompress_stream(std::cin, std::cout, opts);
 }
 
 void decompress_stdin_test(const Options& opts) {
@@ -142,5 +142,5 @@ void decompress_stdin_test(const Options& opts) {
     _setmode(_fileno(stdin), _O_BINARY);
 #endif
     NullOStream null_out;
-    do_decompress(std::cin, null_out, opts);
+    decompress_stream(std::cin, null_out, opts);
 }
