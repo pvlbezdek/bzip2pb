@@ -44,6 +44,8 @@ add_executable(bzip2pb
     src/compress.cpp
     src/decompress.cpp
     src/thread_pool.cpp
+    src/bitscanner.cpp
+    src/bitstream.cpp
 )
 
 target_include_directories(bzip2pb PRIVATE
