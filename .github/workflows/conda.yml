@@ -1,0 +1,39 @@
+name: Conda Build
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  conda-build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-64
+          - os: macos-latest
+            platform: osx-arm64
+          - os: windows-latest
+            platform: win-64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-activate-base: true
+          python-version: "3.10"
+
+      - name: Install conda-build
+        shell: bash -el {0}
+        run: conda install -y conda-build
+
+      - name: Build
+        shell: bash -el {0}
+        run: conda build conda/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: conda-pkg-${{ matrix.platform }}
+          path: ${{ env.CONDA_PREFIX }}/conda-bld/**/*.tar.bz2
