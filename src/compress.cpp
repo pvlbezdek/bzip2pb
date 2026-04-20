@@ -68,9 +68,7 @@ static void do_compress(std::istream& in, std::ostream& out, const Options& opts
         out.write(reinterpret_cast<const char*>(blk.data()),
                   static_cast<std::streamsize>(blk.size()));
 
-    if (opts.verbose)
-        std::cerr << "Compressed " << compressed_blocks.size() << " block(s) with "
-                  << threads << " thread(s), block size " << block_size << " B\n";
+    (void)opts; // verbose output handled by caller
 }
 
 void compress_file(const std::string& input_path,
@@ -81,6 +79,15 @@ void compress_file(const std::string& input_path,
     std::ofstream out(output_path, std::ios::binary);
     if (!out) throw std::runtime_error("Cannot create: " + output_path);
     do_compress(in, out, opts);
+}
+
+void compress_file_stdout(const std::string& input_path, const Options& opts) {
+    std::ifstream in(input_path, std::ios::binary);
+    if (!in) throw std::runtime_error("Cannot open: " + input_path);
+#ifdef _WIN32
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
+    do_compress(in, std::cout, opts);
 }
 
 void compress_stdin(const Options& opts) {

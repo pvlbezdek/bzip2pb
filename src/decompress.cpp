@@ -10,6 +10,18 @@
 #include <stdexcept>
 #include <vector>
 
+// Discards all written bytes — used for -t test mode.
+class NullSink : public std::streambuf {
+protected:
+    std::streamsize xsputn(const char*, std::streamsize n) override { return n; }
+    int_type overflow(int_type c) override { return c; }
+};
+class NullOStream : public std::ostream {
+    NullSink sink_;
+public:
+    NullOStream() : std::ostream(&sink_) {}
+};
+
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
@@ -88,9 +100,7 @@ static void do_decompress(std::istream& in, std::ostream& out, const Options& op
     }
     drain(0);
 
-    if (opts.verbose)
-        std::cerr << "Decompressed " << num_blocks << " block(s) with "
-                  << threads << " thread(s)\n";
+    (void)num_blocks; // verbose output handled by caller
 }
 
 void decompress_file(const std::string& input_path,
@@ -103,10 +113,34 @@ void decompress_file(const std::string& input_path,
     do_decompress(in, out, opts);
 }
 
+void decompress_file_stdout(const std::string& input_path, const Options& opts) {
+    std::ifstream in(input_path, std::ios::binary);
+    if (!in) throw std::runtime_error("Cannot open: " + input_path);
+#ifdef _WIN32
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
+    do_decompress(in, std::cout, opts);
+}
+
+void decompress_file_test(const std::string& input_path, const Options& opts) {
+    std::ifstream in(input_path, std::ios::binary);
+    if (!in) throw std::runtime_error("Cannot open: " + input_path);
+    NullOStream null_out;
+    do_decompress(in, null_out, opts);
+}
+
 void decompress_stdin(const Options& opts) {
 #ifdef _WIN32
     _setmode(_fileno(stdin),  _O_BINARY);
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
     do_decompress(std::cin, std::cout, opts);
+}
+
+void decompress_stdin_test(const Options& opts) {
+#ifdef _WIN32
+    _setmode(_fileno(stdin), _O_BINARY);
+#endif
+    NullOStream null_out;
+    do_decompress(std::cin, null_out, opts);
 }
