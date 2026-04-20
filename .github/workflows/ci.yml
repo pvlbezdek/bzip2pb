@@ -30,6 +30,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: c3867e714dd3a51c272826eea77267876517ed99
+
+      - name: Export VCPKG_INSTALLATION_ROOT
+        shell: bash
+        run: echo "VCPKG_INSTALLATION_ROOT=$VCPKG_ROOT" >> "$GITHUB_ENV"
+
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
 
