@@ -54,3 +54,7 @@ jobs:
           else
             ./build/bzip2pb --version
           fi
+
+      - name: Test
+        if: ${{ !matrix.cross_compile }}
+        run: ctest --test-dir build -C Release --output-on-failure

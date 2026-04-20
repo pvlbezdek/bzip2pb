@@ -1,6 +1,10 @@
 #pragma once
 #include "common.h"
+#include <iosfwd>
 #include <string>
+
+// Core stream API — used by tests and by the file/stdin wrappers below.
+void decompress_stream(std::istream& in, std::ostream& out, const Options& opts);
 
 void decompress_file(const std::string& input_path,
                      const std::string& output_path,
