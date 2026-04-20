@@ -41,6 +41,7 @@ endif()
 
 add_executable(bzip2pb
     src/main.cpp
+    src/cli.cpp
     src/compress.cpp
     src/decompress.cpp
     src/thread_pool.cpp

@@ -7,5 +7,8 @@ struct Options {
     bool     keep          = false;
     bool     force         = false;
     bool     verbose       = false;
+    bool     quiet         = false;   // -q: suppress warnings
     bool     decompress    = false;
+    bool     test          = false;   // -t: decompress to null sink (verify integrity)
+    bool     to_stdout     = false;   // -c: write to stdout, keep input
 };
