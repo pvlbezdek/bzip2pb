@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            preset: ci-windows-latest-x64
+            name: Windows x64
+          - os: windows-latest
+            preset: ci-windows-latest-ARM64
+            name: Windows ARM64 (cross-compile)
+            cross_compile: true
+          - os: ubuntu-latest
+            preset: ci-ubuntu-latest-x64
+            name: Linux x64
+          - os: macos-latest
+            preset: ci-macos-latest-arm64
+            name: macOS ARM64
+
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Smoke test
+        if: ${{ !matrix.cross_compile }}
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            ./build/Release/bzip2pb.exe --version
+          else
+            ./build/bzip2pb --version
+          fi
