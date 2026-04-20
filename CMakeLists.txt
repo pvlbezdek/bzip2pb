@@ -92,10 +92,13 @@ install(TARGETS bzip2pb
 )
 
 # ---------------------------------------------------------------------------
-# Tests (only when Catch2 is available — skipped on cross-compile targets)
+# Tests (skipped on ARM64 cross-compile and when Catch2 is absent)
 # ---------------------------------------------------------------------------
+# catch_discover_tests runs the test binary at post-build time to list tests.
+# An ARM64 binary cannot execute on the x64 CI host, so exclude the test
+# target entirely for that configuration.
 find_package(Catch2 3 QUIET)
-if(Catch2_FOUND)
+if(Catch2_FOUND AND NOT (MSVC AND CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64"))
     include(CTest)
     include(Catch)
     enable_testing()
@@ -121,8 +124,10 @@ if(Catch2_FOUND)
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -C $<CONFIG>
         DEPENDS bzip2pb_tests
     )
-else()
+elseif(NOT Catch2_FOUND)
     message(STATUS "Catch2 not found — test target skipped")
+else()
+    message(STATUS "Catch2 found — test target skipped (ARM64 cross-compile)")
 endif()
 
 # ---------------------------------------------------------------------------
