@@ -1,6 +1,7 @@
 #include "common.h"
 #include "compress.h"
 #include "decompress.h"
+#include "version.h"
 #include <cstring>
 #include <filesystem>
 #include <iostream>
@@ -22,6 +23,7 @@ static void usage(const char* prog) {
         "  -b N, --block N     Block size 1-9 × 100 KB (default: 9 = 900 KB)\n"
         "  -1 .. -9            Shorthand for --block N\n"
         "  -v, --verbose       Print progress\n"
+        "  -V, --version       Print version and exit\n"
         "  -h, --help          Show this help\n"
         "\n"
         "With no files: reads stdin, writes stdout.\n"
@@ -55,6 +57,11 @@ int main(int argc, char* argv[]) {
             else if (std::strcmp(a, "--keep")       == 0) opts.keep    = true;
             else if (std::strcmp(a, "--force")      == 0) opts.force   = true;
             else if (std::strcmp(a, "--verbose")    == 0) opts.verbose = true;
+            else if (std::strcmp(a, "--version")    == 0) {
+                std::cout << "bzip2pb " BZIP2PB_VERSION_STRING
+                          << " (" BZIP2PB_PLATFORM " " BZIP2PB_ARCH ")\n";
+                return 0;
+            }
             else if (std::strcmp(a, "--help")       == 0) { usage(argv[0]); return 0; }
             else if (std::strcmp(a, "--threads") == 0 && i + 1 < argc)
                 opts.num_threads = static_cast<unsigned>(std::stoul(argv[++i]));
@@ -73,6 +80,10 @@ int main(int argc, char* argv[]) {
                 case 'k': opts.keep    = true; break;
                 case 'f': opts.force   = true; break;
                 case 'v': opts.verbose = true; break;
+                case 'V':
+                    std::cout << "bzip2pb " BZIP2PB_VERSION_STRING
+                              << " (" BZIP2PB_PLATFORM " " BZIP2PB_ARCH ")\n";
+                    return 0;
                 case 'h': usage(argv[0]); return 0;
                 case 'p':
                     if (a[j + 1]) {
