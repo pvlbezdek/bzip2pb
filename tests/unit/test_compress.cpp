@@ -94,11 +94,15 @@ TEST_CASE("compress_stream with 4 threads produces valid output") {
     CHECK(recovered == input);
 }
 
-TEST_CASE("compress_stream empty input produces empty output") {
+TEST_CASE("compress_stream empty input produces valid empty bzip2 stream") {
     const std::vector<uint8_t> input;
     Options opts;
     const auto compressed = compress_via_stream(input, opts);
-    CHECK(compressed.empty());
+    // Empty input must produce a non-empty valid bzip2 stream (header + EOS),
+    // not zero bytes, so that decompress can round-trip it correctly.
+    REQUIRE_FALSE(compressed.empty());
+    const auto recovered = bz2_decompress_buf(compressed, 1);
+    CHECK(recovered.empty());
 }
 
 TEST_CASE("compress_stream single byte input") {
