@@ -18,7 +18,7 @@ static std::vector<uint8_t> compress_block(std::vector<uint8_t> input, int level
     unsigned int out_size = static_cast<unsigned int>(input.size() * 1.02 + 600);
     std::vector<uint8_t> output(out_size);
 
-    int ret = BZ2_bzBuffToBuffCompress(
+    const int ret = BZ2_bzBuffToBuffCompress(
         reinterpret_cast<char*>(output.data()), &out_size,
         reinterpret_cast<char*>(input.data()),
         static_cast<unsigned int>(input.size()),
@@ -29,15 +29,6 @@ static std::vector<uint8_t> compress_block(std::vector<uint8_t> input, int level
 
     output.resize(out_size);
     return output;
-}
-
-static void write_le32(std::ostream& os, uint32_t v) {
-    uint8_t buf[4] = {
-        static_cast<uint8_t>(v),
-        static_cast<uint8_t>(v >> 8),
-        static_cast<uint8_t>(v >> 16),
-        static_cast<uint8_t>(v >> 24)};
-    os.write(reinterpret_cast<char*>(buf), 4);
 }
 
 static void do_compress(std::istream& in, std::ostream& out, const Options& opts) {
@@ -62,7 +53,7 @@ static void do_compress(std::istream& in, std::ostream& out, const Options& opts
     std::vector<uint8_t> buf(block_size);
     while (true) {
         in.read(reinterpret_cast<char*>(buf.data()), block_size);
-        auto n = static_cast<size_t>(in.gcount());
+        const auto n = static_cast<size_t>(in.gcount());
         if (n == 0) break;
         std::vector<uint8_t> chunk(buf.data(), buf.data() + n);
         futures.push_back(pool.submit(compress_block, std::move(chunk), opts.block_level));
@@ -70,24 +61,15 @@ static void do_compress(std::istream& in, std::ostream& out, const Options& opts
     }
     drain(0);
 
-    const uint32_t num_blocks = static_cast<uint32_t>(compressed_blocks.size());
-
-    // Write header
-    out.write(BZIP2PB_MAGIC.data(), 4);
-    uint8_t ver = BZIP2PB_VERSION;
-    out.write(reinterpret_cast<char*>(&ver), 1);
-    write_le32(out, block_size);
-    write_le32(out, num_blocks);
-
-    // Write size-prefixed compressed blocks
-    for (auto& blk : compressed_blocks) {
-        write_le32(out, static_cast<uint32_t>(blk.size()));
+    // Each compressed_block is already a complete bzip2 stream produced by
+    // BZ2_bzBuffToBuffCompress.  Concatenating them yields a valid multi-stream
+    // .bz2 file per the bzip2 specification.
+    for (const auto& blk : compressed_blocks)
         out.write(reinterpret_cast<const char*>(blk.data()),
                   static_cast<std::streamsize>(blk.size()));
-    }
 
     if (opts.verbose)
-        std::cerr << "Compressed " << num_blocks << " block(s) with "
+        std::cerr << "Compressed " << compressed_blocks.size() << " block(s) with "
                   << threads << " thread(s), block size " << block_size << " B\n";
 }
 
