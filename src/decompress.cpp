@@ -73,14 +73,17 @@ void decompress_stream(std::istream& in, std::ostream& out, const Options& opts)
                                 ? boundaries[i + 1].bit_offset
                                 : file_bits;
 
-        // Reconstruct a minimal self-contained bzip2 stream for this one block.
-        auto sub = reconstruct_substream(
-            compressed.data(), compressed.size(),
-            boundaries[i].bit_offset, next_bit, digit);
-
-        // Decompress the sub-stream on a pool thread.
+        // Reconstruct and decompress on a pool thread — reconstruction reads
+        // only from the immutable 'compressed' buffer so all tasks run safely
+        // in parallel.
+        const uint8_t* src      = compressed.data();
+        const size_t   src_size = compressed.size();
+        const size_t   blk_bit  = boundaries[i].bit_offset;
         futures.push_back(pool.submit(
-            [sub = std::move(sub)]() mutable -> std::vector<uint8_t> {
+            [src, src_size, blk_bit, next_bit, digit]() -> std::vector<uint8_t> {
+                auto sub = reconstruct_substream(
+                    src, src_size, blk_bit, next_bit, digit);
+
                 // Max uncompressed size per bzip2 block is 900 KB (block level 9).
                 unsigned int out_size = 900u * 1024u + 1024u;
                 std::vector<uint8_t> output(out_size);

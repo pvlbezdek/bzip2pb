@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.2] — 2026-04-21
+
+### Improved
+- **Reconstruction now runs in parallel with decompression.**
+  `reconstruct_substream` previously ran serially on the main thread before
+  each block was submitted to the pool.  Each call now executes inside the pool
+  task itself: all blocks are reconstructed and decompressed concurrently.
+  The source buffer is read-only after loading so no synchronisation is needed.
+  Expected improvement: ~5–10% additional throughput for binary data on
+  multi-core hardware.
+
+---
+
 ## [0.2.1] — 2026-04-21
 
 ### Fixed
