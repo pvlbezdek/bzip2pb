@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.3] — 2026-04-21
+
+### Changed
+- **libbzip2 1.0.8 source vendored into `third_party/bzip2/`.**
+  The project no longer links against the system or vcpkg-provided libbzip2.
+  All nine upstream source files (`blocksort.c`, `huffman.c`, `crctable.c`,
+  `randtable.c`, `compress.c`, `decompress.c`, `bzlib.c`, `bzlib.h`,
+  `bzlib_private.h`) are compiled directly as the `bzip2_vendored` CMake
+  static-library target.  Warnings are suppressed on the vendored files so
+  `-Werror` / `/WX` does not flag upstream code.
+- **`bzip2` removed from `vcpkg.json` and conda `host:` requirements.**
+  `third_party/bzip2/` is now the sole source of the libbzip2 API.
+
+---
+
 ## [0.2.2] — 2026-04-21
 
 ### Improved

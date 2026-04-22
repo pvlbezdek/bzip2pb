@@ -1,12 +1,32 @@
 cmake_minimum_required(VERSION 3.20)
-project(bzip2pb VERSION 0.2.2 LANGUAGES CXX)
+project(bzip2pb VERSION 0.2.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(BZip2 REQUIRED)
 find_package(Threads REQUIRED)
+
+# ---------------------------------------------------------------------------
+# bzip2_vendored — libbzip2 1.0.8 source vendored into third_party/bzip2/
+# Warnings suppressed so -Werror does not flag upstream code.
+# This target is the primary optimization target for future BWT work.
+# ---------------------------------------------------------------------------
+add_library(bzip2_vendored STATIC
+    third_party/bzip2/blocksort.c
+    third_party/bzip2/huffman.c
+    third_party/bzip2/crctable.c
+    third_party/bzip2/randtable.c
+    third_party/bzip2/compress.c
+    third_party/bzip2/decompress.c
+    third_party/bzip2/bzlib.c
+)
+target_include_directories(bzip2_vendored PUBLIC third_party/bzip2)
+if(MSVC)
+    target_compile_options(bzip2_vendored PRIVATE /W0)
+else()
+    target_compile_options(bzip2_vendored PRIVATE -w)
+endif()
 
 # Platform string embedded in the binary via version.h
 if(WIN32)
@@ -55,7 +75,7 @@ target_include_directories(bzip2pb_lib PUBLIC
     src
     ${CMAKE_CURRENT_BINARY_DIR}/src
 )
-target_link_libraries(bzip2pb_lib PUBLIC BZip2::BZip2 Threads::Threads)
+target_link_libraries(bzip2pb_lib PUBLIC bzip2_vendored Threads::Threads)
 
 if(MSVC)
     target_compile_options(bzip2pb_lib PRIVATE /W4 /WX /O2 /EHsc)
