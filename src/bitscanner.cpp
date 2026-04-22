@@ -11,13 +11,18 @@ std::vector<BlockBoundary> scan_bzip2_blocks(const uint8_t* data, size_t size_by
 
     std::vector<BlockBoundary> result;
 
-    // Start after the 4-byte stream header ("BZh" + digit).
-    // Load 8 bytes as big-endian uint64 and check all 8 bit offsets per byte.
-    for (size_t b = 4; b + 8 <= size_bytes; ++b) {
-        uint64_t word = 0;
-        for (int k = 0; k < 8; ++k)
-            word = (word << 8) | data[b + static_cast<size_t>(k)];
+    // Need at least 4 header bytes + 8 bytes for the first word.
+    if (size_bytes < 12) return result;
 
+    // Build the initial sliding window from bytes [4..11].
+    uint64_t word = 0;
+    for (int k = 0; k < 8; ++k)
+        word = (word << 8) | data[4 + static_cast<size_t>(k)];
+
+    // Slide one byte at a time; each step tests all 8 bit-offsets within the
+    // current byte using the preloaded 64-bit window (1 memory read per step
+    // instead of 8, ~8x fewer loads than rebuilding the word each iteration).
+    for (size_t b = 4; b + 8 <= size_bytes; ++b) {
         for (int d = 0; d < 8; ++d) {
             const uint64_t shifted = (word << static_cast<unsigned>(d)) & MASK48;
             if (shifted == BLOCK_MAGIC)
@@ -25,6 +30,9 @@ std::vector<BlockBoundary> scan_bzip2_blocks(const uint8_t* data, size_t size_by
             else if (shifted == EOS_MAGIC)
                 result.push_back({ b * 8 + static_cast<size_t>(d), true });
         }
+        // Advance the window by one byte.
+        if (b + 8 < size_bytes)
+            word = (word << 8) | data[b + 8];
     }
 
     std::sort(result.begin(), result.end(),

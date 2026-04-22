@@ -16,6 +16,7 @@ and leaves a handoff file in `docs/agent-handoff/` for the next agent.
 | 5    | `step/05-benchmarks`           | Speed/ratio benchmarks vs bzip2 family   |
 | 6    | `step/06-conda`                | Conda recipe, multi-platform build       |
 | 7    | `step/07-documentation`        | README, architecture docs, man page      |
+| 8    | `perf/08-decompression-reconstruction` | Decompression throughput & scanner speed ✓ |
 
 ---
 
@@ -1123,5 +1124,73 @@ For a 100MB file: ~800M comparisons, completing in ~0.2s on a modern CPU.
 
 ---
 
-*Last updated: Step 0 (plan creation). Each agent updates the relevant step
-section with actual outcomes.*
+---
+
+## Step 8 — Decompression Throughput & Scanner Speed ✓ COMPLETE
+
+**Branch:** `perf/08-decompression-reconstruction`
+**Reads:** `docs/agent-handoff/step-07-complete.md`
+**Writes:** `docs/agent-handoff/step-08-complete.md`
+
+### Problem
+
+Benchmarks on macOS M1 Pro revealed two performance gaps versus lbzip2:
+
+1. **Binary decompression showed zero thread-scaling** — 18 MB/s at 1, 4, and auto
+   threads alike, well below lbzip2's 97–109 MB/s.
+2. **Bitscanner rebuilt the 64-bit word from scratch** (8 byte-loads per step) on
+   every byte position.
+
+### Root cause
+
+`reconstruct_substream` in `src/bitstream.cpp` copied block bits **one bit at a
+time** on the main thread before submitting each block to the thread pool.  For a
+10 MB incompressible file at level 9 (~11 × 900 KB blocks) this amounted to
+~79 million loop iterations running serially, holding up all worker threads.
+Adding more threads provided zero benefit because the bottleneck was entirely in
+the single-threaded reconstruction step, not in the actual BZ2 decompression.
+
+For highly-compressible text (ratio ≈ 0) the compressed blocks are tiny so the
+reconstruction was trivially fast — which is why text decompression looked fine
+in benchmarks.
+
+### Changes
+
+#### `src/bitstream.cpp`
+
+Replaced the `O(n_bits)` bit-by-bit copy loop with `copy_bits_byte_aligned()`,
+an `O(n_bits/8)` byte-level barrel-shift copy:
+
+- **Byte-aligned source (`shift == 0`):** `std::memcpy` for the bulk, mask the
+  last partial byte.
+- **Unaligned source (`shift 1–7`):** one `(src[b] << shift) | (src[b+1] >> rshift)`
+  per output byte — 8× fewer iterations than bit-by-bit.
+
+`BitWriter` gained an `initial_bit_pos` constructor parameter so subsequent
+EOS-magic and CRC writes resume correctly at the partial last byte produced by
+the bulk copy.
+
+Expected improvement: **~8× faster reconstruction → decompression now scales
+linearly with thread count**, expected to reach ~100 MB/s on 4-core M1 Pro
+(matching lbzip2).
+
+#### `src/bitscanner.cpp`
+
+Replaced the inner 8-byte word-rebuild loop with a **sliding window**: the
+64-bit word is seeded once and updated by one byte per step
+(`word = (word << 8) | data[b+8]`), reducing memory reads by ~8×.
+
+### Known limitations (not addressed here)
+
+**Text compression speed gap** (bzip2pb 30–41 MB/s vs lbzip2 163–201 MB/s at
+4 threads) is caused by libbz2's BWT sort using a Bentley-Sedgewick algorithm
+that degrades on repetitive input.  Fixing this requires replacing the BWT
+backend (e.g. integrating `libsais` or `divsufsort`) — tracked as future work.
+
+### Success criteria
+
+- All 175 unit/integration assertions pass (`bzip2pb_tests.exe`).
+- Binary decompression throughput scales with thread count (expected ~4× for
+  4 threads on incompressible data).
+
+*Last updated: Step 8 complete.*
