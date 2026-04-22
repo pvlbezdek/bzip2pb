@@ -1,9 +1,7 @@
 cmake -B build -S . ^
     -G "Ninja" ^
     -DCMAKE_BUILD_TYPE=Release ^
-    -DCMAKE_INSTALL_PREFIX="%LIBRARY_PREFIX%" ^
-    -DBZIP2_INCLUDE_DIR="%LIBRARY_INC%" ^
-    -DBZIP2_LIBRARIES="%LIBRARY_LIB%\bz2.lib"
+    -DCMAKE_INSTALL_PREFIX="%LIBRARY_PREFIX%"
 if errorlevel 1 exit 1
 
 cmake --build build

@@ -18,6 +18,7 @@ and leaves a handoff file in `docs/agent-handoff/` for the next agent.
 | 7    | `step/07-documentation`        | README, architecture docs, man page      |
 | 8    | `perf/08-decompression-reconstruction` | Decompression throughput & scanner speed ✓ |
 | 9    | `perf/09-parallel-reconstruction`      | Parallel sub-stream reconstruction ✓       |
+| 10   | `step/10-vendor-libbzip2`              | Vendor libbzip2 1.0.8 source for optimization ✓ |
 
 ---
 
@@ -1252,3 +1253,65 @@ from the same immutable buffer without any synchronisation.
   (expected ~5–10% gain over Step 8 baseline for binary data).
 
 *Last updated: Step 9 complete.*
+
+---
+
+## Step 10 — Vendor libbzip2 1.0.8 Source ✓ COMPLETE
+
+**Branch:** `step/10-vendor-libbzip2`
+**Reads:** `docs/agent-handoff/step-09-complete.md`
+**Writes:** `docs/agent-handoff/step-10-complete.md`
+
+### Goal
+
+Bring the libbzip2 1.0.8 C sources into the repository so that BWT and
+Huffman internals can be modified without patching an external library.
+
+### Changes
+
+#### `third_party/bzip2/` (new directory)
+
+Nine files vendored verbatim from libbzip2 1.0.8
+(https://gitlab.com/bzip2/bzip2/-/tree/bzip2-1.0.8):
+
+| File | Purpose |
+|---|---|
+| `blocksort.c` | **BWT sort — primary optimization target** |
+| `huffman.c` | Huffman coding |
+| `crctable.c` | CRC table |
+| `randtable.c` | Randomisation table |
+| `compress.c` | Compression pipeline |
+| `decompress.c` | Decompression pipeline |
+| `bzlib.c` | Public API |
+| `bzlib.h` | Public header |
+| `bzlib_private.h` | Internal header |
+
+#### `CMakeLists.txt`
+
+- Removed `find_package(BZip2 REQUIRED)`.
+- Added `bzip2_vendored` `STATIC` library target built from
+  `third_party/bzip2/` with warnings suppressed (`/W0` / `-w`) so
+  `-Werror` / `/WX` does not flag upstream code.
+- Replaced all `BZip2::BZip2` references with `bzip2_vendored`.
+
+#### `vcpkg.json`
+
+Removed `"bzip2"` from `dependencies`; only `"catch2"` remains.
+
+#### `conda/meta.yaml`, `conda/build.sh`, `conda/bld.bat`
+
+Removed the `bzip2` `host:` requirement and the `-DBZIP2_INCLUDE_DIR` /
+`-DBZIP2_LIBRARIES` flags — no longer needed.
+
+### Primary optimization target
+
+`third_party/bzip2/blocksort.c` contains the Bentley-Sedgewick BWT sort
+that causes text-compression to be 5–7× slower than lbzip2.  Future work:
+replace or supplement this sort with `libsais` or `divsufsort`.
+
+### Success criteria
+
+- All 58 Catch2 assertions pass after the switch to the vendored library.
+- Build succeeds on all four CI matrix targets without additional flags.
+
+*Last updated: Step 10 complete.*
