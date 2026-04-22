@@ -17,6 +17,7 @@ and leaves a handoff file in `docs/agent-handoff/` for the next agent.
 | 6    | `step/06-conda`                | Conda recipe, multi-platform build       |
 | 7    | `step/07-documentation`        | README, architecture docs, man page      |
 | 8    | `perf/08-decompression-reconstruction` | Decompression throughput & scanner speed ✓ |
+| 9    | `perf/09-parallel-reconstruction`      | Parallel sub-stream reconstruction ✓       |
 
 ---
 
@@ -1194,3 +1195,60 @@ backend (e.g. integrating `libsais` or `divsufsort`) — tracked as future work.
   4 threads on incompressible data).
 
 *Last updated: Step 8 complete.*
+
+---
+
+## Step 9 — Parallel Sub-Stream Reconstruction ✓ COMPLETE
+
+**Branch:** `perf/09-parallel-reconstruction`
+**Reads:** `docs/agent-handoff/step-08-complete.md`
+**Writes:** `docs/agent-handoff/step-09-complete.md`
+
+### Problem
+
+After Step 8, binary decompression still trailed lbzip2 by ~25–35%
+(bzip2pb auto ≈ 68–84 MB/s vs lbzip2 4-thread ≈ 99–109 MB/s).
+`reconstruct_substream` was now fast (byte-level barrel-shift copy), but it
+still ran serially on the main thread: the main thread reconstructed each
+sub-stream, then submitted the decompression-only task to the pool.  For large
+files with many blocks, the main thread could become the new bottleneck
+(sequential reconstruction overhead + task submission latency).
+
+### Root cause
+
+```
+Before Step 9:
+  main thread:  [reconstruct block 0] → submit   [reconstruct block 1] → submit ...
+  pool thread:                           [decompress 0]  [decompress 1] ...
+```
+
+Reconstruction (now ~8× faster) still serialised the dispatch loop.
+
+### Change
+
+Moved `reconstruct_substream` inside the pool lambda so reconstruction and
+decompression are a single task per block, all running concurrently:
+
+```
+After Step 9:
+  main thread:  submit  submit  submit  submit ...  (dispatch only)
+  pool threads: [reconstruct+decompress 0]
+                [reconstruct+decompress 1]
+                [reconstruct+decompress 2] ...
+```
+
+`compressed` is `const` after loading and never mutated; all pool tasks read
+from the same immutable buffer without any synchronisation.
+
+### Files changed
+
+- `src/decompress.cpp` — `reconstruct_substream` call moved into pool lambda;
+  captures raw pointer + size instead of a pre-built `std::vector`.
+
+### Success criteria
+
+- All existing Catch2 assertions pass unchanged.
+- Binary decompression throughput improves measurably on multi-core hardware
+  (expected ~5–10% gain over Step 8 baseline for binary data).
+
+*Last updated: Step 9 complete.*
