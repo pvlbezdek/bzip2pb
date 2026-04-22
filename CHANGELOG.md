@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] — perf/08-decompression-reconstruction
+## [0.2.1] — 2026-04-21
 
 ### Fixed
 - **Decompression throughput no longer stalls with multiple threads.**
