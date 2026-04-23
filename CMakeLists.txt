@@ -23,9 +23,9 @@ add_library(bzip2_vendored STATIC
 )
 target_include_directories(bzip2_vendored PUBLIC third_party/bzip2)
 if(MSVC)
-    target_compile_options(bzip2_vendored PRIVATE /W0)
+    target_compile_options(bzip2_vendored PRIVATE /W0 /O2)
 else()
-    target_compile_options(bzip2_vendored PRIVATE -w)
+    target_compile_options(bzip2_vendored PRIVATE -w -O3 -funroll-loops)
 endif()
 
 # Platform string embedded in the binary via version.h
