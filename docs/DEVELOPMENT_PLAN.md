@@ -1425,4 +1425,26 @@ Run tests. Commit.
   bzip2 compatibility verified).
 - Text compression throughput improves vs. Step 10 baseline.
 
-*Last updated: Step 11 planned.*
+### Actual implementation (deviates from plan)
+
+The planned `libsais_bwt` approach (suffix BWT directly into `ptr[]`) was
+implemented first but produced BZ_DATA_ERROR on all non-periodic test inputs.
+Root cause: libsais computes the **suffix** BWT, not the **cyclic** BWT bzip2
+requires.  Suffix and cyclic BWT differ whenever one suffix T[i..n-1] is a
+prefix of another suffix T[j..n-1]; the inverse-BWT then reconstructs the
+wrong data and CRC check fails.
+
+**Working approach** (merged): call `libsais()` on the doubled string T+T
+(length 2N).  Suffix i < N of T+T starts with cyclic rotation i, so the
+suffix sort restricted to positions [0..N-1] gives the exact cyclic rotation
+order.  The second copy of T is written into `block[N..2N-1]` (safe within
+the pre-existing arr2 overshoot allocation).  A single `malloc(2N × int32)`
+holds the temporary SA and is freed before `generateMTFValues` overwrites
+`block[N..]` for Huffman output.
+
+`compress.c` `generateMTFValues` is unchanged from original: it reads
+`block[ptr[i]-1]` (wrap-around) which correctly computes `BWT[i] = T[(SA[i]-1+N)%N]`.
+
+All 58 Catch2 assertions pass.  Version bumped 0.2.3 → 0.2.4.
+
+*Last updated: Step 11 complete.*
