@@ -20,8 +20,12 @@ add_library(bzip2_vendored STATIC
     third_party/bzip2/compress.c
     third_party/bzip2/decompress.c
     third_party/bzip2/bzlib.c
+    third_party/libsais/libsais.c
 )
-target_include_directories(bzip2_vendored PUBLIC third_party/bzip2)
+target_include_directories(bzip2_vendored PUBLIC
+    third_party/bzip2
+    third_party/libsais
+)
 if(MSVC)
     target_compile_options(bzip2_vendored PRIVATE /W0 /O2)
 else()
