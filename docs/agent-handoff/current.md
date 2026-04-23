@@ -1,38 +1,26 @@
-# Step 10 complete: Vendor libbzip2 1.0.8 Source
+# Step 11 complete: libbzip2 Internal Optimizations
 
 ## What was done
-- Copied libbzip2 1.0.8 source verbatim into `third_party/bzip2/` (9 files).
-- Added `bzip2_vendored` CMake STATIC target built from those files;
-  warnings suppressed so `-Werror`/`/WX` does not flag upstream code.
-- Replaced all `BZip2::BZip2` usages and removed `find_package(BZip2)`.
-- Removed `bzip2` from `vcpkg.json` (only `catch2` remains).
-- Removed `bzip2` host requirement and `-DBZIP2_*` flags from conda recipe.
-- Bumped version 0.2.2 → 0.2.3.
+- Compiled libbzip2 1.0.8 with explicit `-O3 -funroll-loops` / `/O2` flags.
+- Replaced `BZ2_blockSort` (O(N²logN) Bentley-Sedgewick + fallback) with libsais
+  v2.10.4 O(N) suffix-array construction on the doubled string T+T.
+- Vendored libsais into `third_party/libsais/`.
+- Bumped version 0.2.3 → 0.2.4.
 
 ## Key files changed
-- `third_party/bzip2/` — 9 vendored libbzip2 1.0.8 source files (new)
-- `CMakeLists.txt` — `bzip2_vendored` target; removed `find_package(BZip2)`
-- `vcpkg.json` — `bzip2` dependency removed
-- `conda/meta.yaml` — `bzip2` host requirement removed
-- `conda/build.sh` / `conda/bld.bat` — `-DBZIP2_*` flags removed
-- `CHANGELOG.md` — `[0.2.3]` entry added
-- `docs/DEVELOPMENT_PLAN.md` — Step 10 row + section added
+- `third_party/libsais/libsais.h` / `libsais.c` — vendored libsais 2.10.4 (new)
+- `CMakeLists.txt` — libsais sources + include dir; optimization flags
+- `third_party/bzip2/blocksort.c` — `BZ2_blockSort` rewritten
+- `CHANGELOG.md` — `[0.2.4]` entry
+- `docs/DEVELOPMENT_PLAN.md` — Step 11 section updated
 
 ## Decisions made
-- Vendored verbatim at 1.0.8 tag — no modifications yet, so the diff
-  from upstream is zero and the provenance is clear.
-- Warnings suppressed only on the vendored target, not on bzip2pb sources.
-- `third_party/bzip2/` not excluded from git — the files are small (~150 KB
-  total) and vendoring means the build is fully self-contained.
+- Doubled-string T+T approach used to obtain cyclic SA from libsais (suffix SA).
+- See `docs/agent-handoff/step-11-complete.md` for full rationale.
 
 ## Known issues / TODOs
-- `third_party/bzip2/blocksort.c` is the Bentley-Sedgewick BWT sort that
-  causes text compression to run 5–7× behind lbzip2. Ready to optimize.
-- No modifications to the vendored code yet — optimization is the next step.
+- Extra malloc(~7 MB) per block sort — can be eliminated in a future step.
+- CRC optimization deferred.
 
 ## What the next agent must know
-- All 58 Catch2 assertions pass after the switch to the vendored library.
-- `third_party/bzip2/blocksort.c` is the primary target for BWT optimization
-  (replace sort with libsais or divsufsort, or implement suffix-array sort).
-- The `bzip2_vendored` target has `-w` / `/W0` so edits there will not
-  produce compiler warnings until you explicitly re-enable them.
+- All 58 tests pass.  Version 0.2.4.  Branch `perf/11-libbzip2-optimizations`.

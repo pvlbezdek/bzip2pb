@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.4] — 2026-04-23
+
+### Performance
+- **O(N) BWT sort via libsais** (`third_party/bzip2/blocksort.c`).
+  Replaced bzip2's Bentley-Sedgewick `mainSort` / exponential `fallbackSort`
+  with libsais v2.10.4 (Apache-2.0), an O(N) suffix-array construction.
+  The cyclic rotation sort bzip2 requires is obtained by calling libsais on
+  the doubled string T+T and filtering the suffix-array to positions < N,
+  ensuring decompressor compatibility.  Peak temporary memory per block
+  increases by 2×N bytes (second copy) + 8×N bytes (SA), freed before the
+  Huffman stage.
+- **Explicit `-O3 -funroll-loops` / `/O2`** flags added to the
+  `bzip2_vendored` CMake target so the sort code is always optimized
+  regardless of build type.
+
+---
+
 ## [0.2.3] — 2026-04-21
 
 ### Changed

@@ -147,8 +147,8 @@ void generateMTFValues ( EState* s )
       except for the last one, which is arranged in 
       compressBlock().
    */
+   UChar*  block = s->block;
    UInt32* ptr   = s->ptr;
-   UChar* block  = s->block;
    UInt16* mtfv  = s->mtfv;
 
    makeMaps_e ( s );
@@ -163,8 +163,7 @@ void generateMTFValues ( EState* s )
    for (i = 0; i < s->nblock; i++) {
       UChar ll_i;
       AssertD ( wr <= i, "generateMTFValues(1)" );
-      j = ptr[i]-1; if (j < 0) j += s->nblock;
-      ll_i = s->unseqToSeq[block[j]];
+      j = (Int32)ptr[i] - 1; if (j < 0) j += s->nblock; ll_i = s->unseqToSeq[block[j]];
       AssertD ( ll_i < s->nInUse, "generateMTFValues(2a)" );
 
       if (yy[0] == ll_i) { 

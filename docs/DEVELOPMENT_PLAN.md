@@ -19,6 +19,7 @@ and leaves a handoff file in `docs/agent-handoff/` for the next agent.
 | 8    | `perf/08-decompression-reconstruction` | Decompression throughput & scanner speed ✓ |
 | 9    | `perf/09-parallel-reconstruction`      | Parallel sub-stream reconstruction ✓       |
 | 10   | `step/10-vendor-libbzip2`              | Vendor libbzip2 1.0.8 source for optimization ✓ |
+| 11   | `perf/11-libbzip2-optimizations`       | Compiler flags + libsais BWT sort (close text-compression gap) |
 
 ---
 
@@ -1315,3 +1316,135 @@ replace or supplement this sort with `libsais` or `divsufsort`.
 - Build succeeds on all four CI matrix targets without additional flags.
 
 *Last updated: Step 10 complete.*
+
+---
+
+## Step 11 — libbzip2 Internal Optimizations
+
+**Branch:** `perf/11-libbzip2-optimizations`
+**Reads:** `docs/agent-handoff/step-10-complete.md`
+**Writes:** `docs/agent-handoff/step-11-complete.md`
+
+### Goals
+
+1. Close the 5–7× text-compression gap between bzip2pb and lbzip2 by replacing
+   the O(N² log N) BWT sort in `third_party/bzip2/blocksort.c` with the O(N)
+   libsais suffix-array algorithm.
+2. Ensure all 58 Catch2 assertions still pass after each change.
+3. Bump version 0.2.3 → 0.2.4.
+
+### Analysis of inefficiencies in the vendored libbzip2 1.0.8
+
+| Area | File | Impact | Priority |
+|------|------|--------|----------|
+| BWT sort: O(N²logN) `mainSort` + O(N log²N) `fallbackSort` | `blocksort.c` | 5–7× text-compression slowdown vs lbzip2 | **HIGH** |
+| No explicit `-O2`/`-O3` flags on `bzip2_vendored` CMake target | `CMakeLists.txt` | Unoptimized debug builds; missed `-funroll-loops` in release | **LOW** |
+| Per-byte CRC (`BZ_UPDATE_CRC` single table-lookup per byte) | `bzlib_private.h` / `bzlib.c` | ~5% decompression overhead; HW CRC32C incompatible with bzip2 polynomial | DEFERRED |
+
+#### BWT sort details
+
+`BZ2_blockSort` first calls `mainSort`, a Bentley-Sedgewick 3-way string quicksort
+with a work budget (`workFactor`). On repetitive (text) input the budget is exhausted
+quickly, at which point it falls back to `fallbackSort` (exponential radix sort).
+Both are far slower than suffix-array algorithms for this input class:
+
+| Algorithm | Complexity | Notes |
+|-----------|-----------|-------|
+| `mainSort` | O(N² log N) worst case | Bentley-Sedgewick qsort — fast for random data |
+| `fallbackSort` | O(N log² N) | Triggered on repetitive input |
+| divsufsort | O(N log N) | Used by lbzip2 |
+| libsais | O(N) | SAIS algorithm; used in this step |
+
+**Replacement strategy:** Call `libsais_bwt()` directly.
+`libsais_bwt(T, U, A, n, 0, NULL)` computes the cyclic BWT of block `T` into
+output buffer `U` and returns the primary index (= `origPtr`).  The workspace
+array `A` needs `n × sizeof(int32_t)` bytes; this is allocated via `malloc`/`free`
+per block (≤ 3.6 MB for a 900 KB block) and is temporary.
+
+`generateMTFValues` currently reads `block[ptr[i]−1]` (character before the i-th
+sorted rotation). After the switch, `(UChar*)s->ptr` holds the BWT directly, so
+the read becomes `bwt[i]` — simpler and avoids a level of indirection.
+
+### Subtasks
+
+#### 11.1 — Compiler optimization flags for `bzip2_vendored`
+
+Add explicit per-target optimization flags to `CMakeLists.txt`:
+- MSVC: `/O2` (already Release-mode default but make it explicit)
+- GCC / Clang: `-O3 -funroll-loops`
+
+Run tests. Commit.
+
+#### 11.2 — Replace BWT sort with libsais
+
+1. Vendor libsais into `third_party/libsais/` (two files: `libsais.h`,
+   `libsais.c`; MIT licence).
+2. Add `third_party/libsais/libsais.c` to the `bzip2_vendored` CMake target and
+   expose `third_party/libsais` as an include directory.
+3. In `third_party/bzip2/blocksort.c`, add `#include "libsais.h"` and replace
+   the body of `BZ2_blockSort` with a `libsais_bwt` call:
+   ```c
+   void BZ2_blockSort(EState* s) {
+       Int32  nblock = s->nblock;
+       Int32* ws     = (Int32*)malloc((size_t)nblock * sizeof(Int32));
+       if (!ws) { /* fall back if OOM */ fallbackSort(...); return; }
+       Int32 origPtr = libsais_bwt(s->block, (UChar*)s->ptr, ws, nblock, 0, NULL);
+       free(ws);
+       AssertH(origPtr >= 0, 1003);
+       s->origPtr = origPtr;
+   }
+   ```
+4. In `third_party/bzip2/compress.c`, update `generateMTFValues` to read the
+   BWT directly from `(UChar*)s->ptr` instead of dereferencing `ptr[i]−1`:
+   ```c
+   UChar* bwt = (UChar*)s->ptr;
+   ...
+   ll_i = s->unseqToSeq[bwt[i]];  /* was: block[ptr[i]-1] */
+   ```
+
+Run tests. Commit.
+
+### Files to create / modify
+
+| File | Change |
+|------|--------|
+| `third_party/libsais/libsais.h` | New — vendored libsais 2.x header |
+| `third_party/libsais/libsais.c` | New — vendored libsais 2.x source |
+| `CMakeLists.txt` | Add `-O3 -funroll-loops`/`/O2` to `bzip2_vendored`; add `libsais.c` to sources; add include dir |
+| `third_party/bzip2/blocksort.c` | Replace `BZ2_blockSort` body with `libsais_bwt` call |
+| `third_party/bzip2/compress.c` | `generateMTFValues`: read BWT from `(UChar*)s->ptr` |
+| `CHANGELOG.md` | `[0.2.4]` entry |
+| `docs/DEVELOPMENT_PLAN.md` | This section |
+| `docs/agent-handoff/step-11-complete.md` | New handoff file |
+
+### Success criteria
+
+- All 58 Catch2 assertions pass.
+- `echo "hello world" | bzip2pb | bzip2pb -d` round-trips correctly.
+- `echo "hello world" | bzip2pb | bzip2 -d` produces `hello world` (standard
+  bzip2 compatibility verified).
+- Text compression throughput improves vs. Step 10 baseline.
+
+### Actual implementation (deviates from plan)
+
+The planned `libsais_bwt` approach (suffix BWT directly into `ptr[]`) was
+implemented first but produced BZ_DATA_ERROR on all non-periodic test inputs.
+Root cause: libsais computes the **suffix** BWT, not the **cyclic** BWT bzip2
+requires.  Suffix and cyclic BWT differ whenever one suffix T[i..n-1] is a
+prefix of another suffix T[j..n-1]; the inverse-BWT then reconstructs the
+wrong data and CRC check fails.
+
+**Working approach** (merged): call `libsais()` on the doubled string T+T
+(length 2N).  Suffix i < N of T+T starts with cyclic rotation i, so the
+suffix sort restricted to positions [0..N-1] gives the exact cyclic rotation
+order.  The second copy of T is written into `block[N..2N-1]` (safe within
+the pre-existing arr2 overshoot allocation).  A single `malloc(2N × int32)`
+holds the temporary SA and is freed before `generateMTFValues` overwrites
+`block[N..]` for Huffman output.
+
+`compress.c` `generateMTFValues` is unchanged from original: it reads
+`block[ptr[i]-1]` (wrap-around) which correctly computes `BWT[i] = T[(SA[i]-1+N)%N]`.
+
+All 58 Catch2 assertions pass.  Version bumped 0.2.3 → 0.2.4.
+
+*Last updated: Step 11 complete.*

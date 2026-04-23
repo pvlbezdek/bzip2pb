@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(bzip2pb VERSION 0.2.3 LANGUAGES C CXX)
+project(bzip2pb VERSION 0.2.4 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,12 +20,16 @@ add_library(bzip2_vendored STATIC
     third_party/bzip2/compress.c
     third_party/bzip2/decompress.c
     third_party/bzip2/bzlib.c
+    third_party/libsais/libsais.c
 )
-target_include_directories(bzip2_vendored PUBLIC third_party/bzip2)
+target_include_directories(bzip2_vendored PUBLIC
+    third_party/bzip2
+    third_party/libsais
+)
 if(MSVC)
-    target_compile_options(bzip2_vendored PRIVATE /W0)
+    target_compile_options(bzip2_vendored PRIVATE /W0 /O2)
 else()
-    target_compile_options(bzip2_vendored PRIVATE -w)
+    target_compile_options(bzip2_vendored PRIVATE -w -O3 -funroll-loops)
 endif()
 
 # Platform string embedded in the binary via version.h
