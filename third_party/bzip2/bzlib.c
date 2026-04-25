@@ -221,7 +221,10 @@ void add_pair_to_block ( EState* s )
 {
    Int32 i;
    UChar ch = (UChar)(s->state_in_ch);
-   for (i = 0; i < s->state_in_len; i++) {
+   for (i = s->state_in_len; i >= 4; i -= 4) {
+      BZ_UPDATE_CRC_4( s->blockCRC, ch, ch, ch, ch );
+   }
+   for (; i > 0; i--) {
       BZ_UPDATE_CRC( s->blockCRC, ch );
    }
    s->inUse[s->state_in_ch] = True;
@@ -614,6 +617,18 @@ Bool unRLE_obuf_to_output_FAST ( DState* s )
 
          /* try to finish existing run */
          if (c_state_out_len > 0) {
+            /* 4-byte fast path for long runs of the same character */
+            while (c_state_out_len > 4 && cs_avail_out >= 4) {
+               ((UChar*)cs_next_out)[0] = c_state_out_ch;
+               ((UChar*)cs_next_out)[1] = c_state_out_ch;
+               ((UChar*)cs_next_out)[2] = c_state_out_ch;
+               ((UChar*)cs_next_out)[3] = c_state_out_ch;
+               BZ_UPDATE_CRC_4( c_calculatedBlockCRC, c_state_out_ch,
+                                 c_state_out_ch, c_state_out_ch, c_state_out_ch );
+               c_state_out_len -= 4;
+               cs_next_out     += 4;
+               cs_avail_out    -= 4;
+            }
             while (True) {
                if (cs_avail_out == 0) goto return_notr;
                if (c_state_out_len == 1) break;
