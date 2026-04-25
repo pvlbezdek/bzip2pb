@@ -211,6 +211,7 @@ typedef
       UInt32*  arr2;
       UInt32*  ftab;
       Int32    origPtr;
+      Int32*   sortWorkspace; /* 2*nblockMAX int32 for libsais doubled-string SA */
 
       /* aliases for arr1 and arr2 */
       UInt32*  ptr;

@@ -169,20 +169,24 @@ int BZ_API(BZ2_bzCompressInit)
    if (s == NULL) return BZ_MEM_ERROR;
    s->strm = strm;
 
-   s->arr1 = NULL;
-   s->arr2 = NULL;
-   s->ftab = NULL;
+   s->arr1          = NULL;
+   s->arr2          = NULL;
+   s->ftab          = NULL;
+   s->sortWorkspace = NULL;
 
    n       = 100000 * blockSize100k;
-   s->arr1 = BZALLOC( n                  * sizeof(UInt32) );
-   s->arr2 = BZALLOC( (n+BZ_N_OVERSHOOT) * sizeof(UInt32) );
-   s->ftab = BZALLOC( 65537              * sizeof(UInt32) );
+   s->arr1          = BZALLOC( n                  * sizeof(UInt32) );
+   s->arr2          = BZALLOC( (n+BZ_N_OVERSHOOT) * sizeof(UInt32) );
+   s->ftab          = BZALLOC( 65537              * sizeof(UInt32) );
+   s->sortWorkspace = BZALLOC( 2 * n              * sizeof(Int32)  );
 
-   if (s->arr1 == NULL || s->arr2 == NULL || s->ftab == NULL) {
-      if (s->arr1 != NULL) BZFREE(s->arr1);
-      if (s->arr2 != NULL) BZFREE(s->arr2);
-      if (s->ftab != NULL) BZFREE(s->ftab);
-      if (s       != NULL) BZFREE(s);
+   if (s->arr1 == NULL || s->arr2 == NULL || s->ftab == NULL ||
+       s->sortWorkspace == NULL) {
+      if (s->arr1          != NULL) BZFREE(s->arr1);
+      if (s->arr2          != NULL) BZFREE(s->arr2);
+      if (s->ftab          != NULL) BZFREE(s->ftab);
+      if (s->sortWorkspace != NULL) BZFREE(s->sortWorkspace);
+      if (s                != NULL) BZFREE(s);
       return BZ_MEM_ERROR;
    }
 
@@ -473,9 +477,10 @@ int BZ_API(BZ2_bzCompressEnd)  ( bz_stream *strm )
    if (s == NULL) return BZ_PARAM_ERROR;
    if (s->strm != strm) return BZ_PARAM_ERROR;
 
-   if (s->arr1 != NULL) BZFREE(s->arr1);
-   if (s->arr2 != NULL) BZFREE(s->arr2);
-   if (s->ftab != NULL) BZFREE(s->ftab);
+   if (s->arr1          != NULL) BZFREE(s->arr1);
+   if (s->arr2          != NULL) BZFREE(s->arr2);
+   if (s->ftab          != NULL) BZFREE(s->ftab);
+   if (s->sortWorkspace != NULL) BZFREE(s->sortWorkspace);
    BZFREE(strm->state);
 
    strm->state = NULL;   
