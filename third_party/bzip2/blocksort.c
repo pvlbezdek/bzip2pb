@@ -1031,7 +1031,6 @@ void BZ2_blockSort ( EState* s )
    Int32    ret;
    Int32    i;
    Int32    wr;
-   Int32   *SA2;
 
    /* Compute the CYCLIC suffix array (rotation sort) via libsais on T+T.
       block[] lives in arr2 which is allocated as (nblock+34)*4 bytes; the
@@ -1040,26 +1039,22 @@ void BZ2_blockSort ( EState* s )
       Suffix of T+T at position i < nblock begins with cyclic rotation i,
       so the suffix sort order restricted to positions [0..nblock-1] equals
       the cyclic rotation sort that bzip2 requires.
-      SA2 is freed before generateMTFValues overwrites block[nblock..] for
-      the huffman output (zbits). */
+      sortWorkspace is preallocated in BZ2_bzCompressInit (2*nblockMAX int32)
+      and reused across blocks, avoiding a per-block malloc. */
    memcpy(s->block + nblock, s->block, (size_t)nblock);
 
-   SA2 = (Int32*)malloc(2 * nblock * sizeof(Int32));
-   AssertH( SA2 != NULL, 1002 );
-
-   ret = libsais(s->block, SA2, 2 * nblock, 0, NULL);
+   ret = libsais(s->block, s->sortWorkspace, 2 * nblock, 0, NULL);
    AssertH( ret == 0, 1003 );
 
    wr = 0;
    s->origPtr = -1;
    for (i = 0; i < 2 * nblock; i++) {
-      if (SA2[i] < nblock) {
-         s->ptr[wr] = (UInt32)SA2[i];
-         if (SA2[i] == 0) s->origPtr = wr;
+      if (s->sortWorkspace[i] < nblock) {
+         s->ptr[wr] = (UInt32)s->sortWorkspace[i];
+         if (s->sortWorkspace[i] == 0) s->origPtr = wr;
          wr++;
       }
    }
-   free(SA2);
 
    AssertH( wr == nblock,     1001 );
    AssertH( s->origPtr != -1, 1001 );
