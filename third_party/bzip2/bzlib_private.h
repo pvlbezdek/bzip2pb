@@ -153,6 +153,9 @@ extern Int32 BZ2_rNums[512];
 /*-- Stuff for doing CRCs. --*/
 
 extern UInt32 BZ2_crc32Table[256];
+extern UInt32 BZ2_crc32Table1[256];
+extern UInt32 BZ2_crc32Table2[256];
+extern UInt32 BZ2_crc32Table3[256];
 
 #define BZ_INITIALISE_CRC(crcVar)              \
 {                                              \
@@ -169,6 +172,21 @@ extern UInt32 BZ2_crc32Table[256];
    crcVar = (crcVar << 8) ^                    \
             BZ2_crc32Table[(crcVar >> 24) ^    \
                            ((UChar)cha)];      \
+}
+
+/* Process 4 bytes at once (b0 first).
+   crc' = T3[(crc>>24)^b0] ^ T2[((crc>>16)&0xFF)^b1]
+        ^ T1[((crc>>8)&0xFF)^b2] ^ T0[(crc&0xFF)^b3]  */
+#define BZ_UPDATE_CRC_4(crcVar,b0,b1,b2,b3)              \
+{                                                         \
+   crcVar = BZ2_crc32Table3[((crcVar) >> 24)              \
+                             ^ ((UChar)(b0))]             \
+          ^ BZ2_crc32Table2[(((crcVar) >> 16) & 0xFFU)    \
+                             ^ ((UChar)(b1))]             \
+          ^ BZ2_crc32Table1[(((crcVar) >>  8) & 0xFFU)    \
+                             ^ ((UChar)(b2))]             \
+          ^ BZ2_crc32Table [((crcVar) & 0xFFU)            \
+                             ^ ((UChar)(b3))];            \
 }
 
 
